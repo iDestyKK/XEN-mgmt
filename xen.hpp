@@ -34,6 +34,9 @@
 #include <string>
 #include <vector>
 
+//OS Exclusive Includes
+#include <windows.h>
+
 //Custom Library Includes
 #include "vlq.hpp"
 
@@ -52,6 +55,7 @@ class XEN {
 	public:
 		XEN();
 		XEN(const char *);
+		~XEN();
 
 		//Special Declarations
 		enum MODE_TYPE { M_SXEN, M_DXEN };
@@ -63,6 +67,7 @@ class XEN {
 				_FILE() : size(0), in_xen(false), path(NULL), _BYTE(NULL) {};
 				~_FILE();
 				cn_uint  size;
+				cn_u64   pos;
 				char   * path;
 				cn_byte* _BYTE;
 				bool     in_xen;
@@ -95,15 +100,22 @@ class XEN {
 		//Read Functions
 		void read_file(const char*);
 
+		//Extraction Functions
+		void extract_all(const char*);
+
 	private:
 		MODE_TYPE _MODE;    //0 - SXEN; 1 - DXEN
 		ENC_TYPE  _ENCRYPT; //Encryption Method (DXEN Only)
 		cn_short  _VERSION; //Version of the file
+		char*     _PATH;    //Path to file if opened
 
 		//Data Structures
 		map<string, map<string, _FILE> > _DIRECTORY; //For folders to store files in.
 		map<string, string>             _TAG;        //For file information.
 		map<string, vector<int> >       _LIST;       //For difficulties.
+
+		//Secret functions only I can use because I am special
+		string get_rest_of_stringstream(istringstream&);
 
 
 	protected:

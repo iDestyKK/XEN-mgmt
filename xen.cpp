@@ -26,12 +26,18 @@ XEN::XEN() {
 	_ENCRYPT = XEN::E_NONE;
 	_MODE    = XEN::M_SXEN;
 	_VERSION = __XEN_VER;
+	_PATH    = NULL;
 }
 
 XEN::XEN(const char* fname) {
 	XEN();
 
 	//TODO: Add file importing support
+}
+
+XEN::~XEN() {
+	if (_PATH != NULL)
+		free(_PATH);
 }
 
 //Parse Functions
@@ -46,20 +52,18 @@ void XEN::parse_file(const char* fname) {
 		_SS.str(tmp_str);
 		_SS >> action;
 
-		if (action == "//")
-			continue; //This is a comment in the file. Ignore it.
+		/*if (action.substr(0, 2) == "//")
+			continue; //This is a comment in the file. Ignore it.*/
 
 		if (action == "TAG") {
 			//We are adding a tag in. The next string is the tag name.
 			_SS >> ac_name;
-			getline(_SS, parameter); //YUP CHEATING
-			if (parameter[0] == ' ')
-				parameter.erase(0, 1);
+			parameter = get_rest_of_stringstream(_SS);
 
 			_TAG.insert(pair<string, string>(ac_name, parameter));
 		}
 		if (action == "FOLDER") {
-			_SS >> parameter;
+			parameter = get_rest_of_stringstream(_SS);
 			cur_dir = parameter;
 			_DIRECTORY.insert(pair< string, map<string, _FILE> >(
 				parameter, 
@@ -68,7 +72,7 @@ void XEN::parse_file(const char* fname) {
 		}
 
 		if (action == "FILE") {
-			_SS >> parameter;
+			parameter = get_rest_of_stringstream(_SS);
 			string fname = parameter.substr(parameter.find_last_of("\\") + 1);
 			_DIRECTORY[cur_dir].insert(pair<string, _FILE>(
 				fname,
@@ -284,6 +288,11 @@ void XEN::write_file(const char* fname) {
 //Read Functions
 void XEN::read_file(const char* fname) {
 	FILE *fp = fopen(fname, "rb");
+
+	if (_PATH != NULL)
+		free(_PATH);
+	_PATH = strdup(fname);
+
 	char* SXEN_HEADER = "SXEN",
 	    * DXEN_HEADER = "DXEN",
 		  SCAN_HEADER[5];
@@ -292,11 +301,11 @@ void XEN::read_file(const char* fname) {
 	fread(SCAN_HEADER, 1, 4, fp);
 
 	if (strcmp(SXEN_HEADER, SCAN_HEADER) == 0) {
-		printf("Type: SXEN File.\n");
+		//printf("Type: SXEN File.\n");
 	}
 	else
 	if (strcmp(DXEN_HEADER, SCAN_HEADER) == 0) {
-		printf("Type: DXEN File.\n");
+		//printf("Type: DXEN File.\n");
 	}
 	else {
 		fprintf(stderr, "[ Error ] The file %s is not an SXEN or DXEN file!\n", fname);
@@ -305,7 +314,7 @@ void XEN::read_file(const char* fname) {
 	
 	_VERSION =           VLQ::read_int(fp);
 	_ENCRYPT = (ENC_TYPE)VLQ::read_int(fp);
-	printf("\nFile Version: %d\nEncryption Method: %d\n", _VERSION, _ENCRYPT);
+	//printf("\nFile Version: %d\nEncryption Method: %d\n", _VERSION, _ENCRYPT);
 
 	//Load Tags
 	_TAG.clear();
@@ -315,23 +324,23 @@ void XEN::read_file(const char* fname) {
 		* file_n,
 	    * desc;
 	s3 = VLQ::read_int(fp);
-	printf("\nTags: %d\n", s3);
+	//printf("\nTags: %d\n", s3);
 	for (i = 0; i < s3; i++) {
 		//Read the name
 		s1 = VLQ::read_int(fp);
-		name = (char *) calloc(1, s1 + 1);
+		name = (char *) calloc(s1 + 1, 1);
 		fread(name, 1, s1, fp);
 
 		//Read the description
 		s2 = VLQ::read_int(fp);
-		desc = (char *) calloc(1, s2 + 1);
+		desc = (char *) calloc(s2 + 1, 1);
 		fread(desc, 1, s2, fp);
 
 		_TAG.insert(pair<string, string>(
 			string(name),
 			string(desc)
 		));
-		printf("  %s = %s\n", name, desc);
+		//printf("  %s = %s\n", name, desc);
 
 		free(name);
 		free(desc);
@@ -339,11 +348,11 @@ void XEN::read_file(const char* fname) {
 
 	//Lists
 	s3 = VLQ::read_int(fp);
-	printf("\nLists:\n");
+	//printf("\nLists:\n");
 	for (i = 0; i < s3; i++) {
 		//Read the name
 		s1 = VLQ::read_int(fp);
-		name = (char *) calloc(1, s1 + 1);
+		name = (char *) calloc(s1 + 1, 1);
 		fread(name, 1, s1, fp);
 
 		_LIST.insert(pair< string, vector<int> >(
@@ -351,24 +360,24 @@ void XEN::read_file(const char* fname) {
 			vector<int>()
 		));
 
-		printf("  %s: ", name);
+		//printf("  %s: ", name);
 
 		vector<int>& _REF = _LIST[string(name)];
 		_REF.resize(VLQ::read_int(fp));
 		for (j = 0; j < _REF.size(); j++) {
 			_REF[j] = VLQ::read_int(fp);
-			printf("%d%s", _REF[j], (j == _REF.size() - 1) ? "\n" : ", ");
+			//printf("%d%s", _REF[j], (j == _REF.size() - 1) ? "\n" : ", ");
 		}
 
 		free(name);
 	}
 
 	//Read Directories and Files
-	printf("\nFiles:\n");
+	//printf("\nFiles:\n");
 	dir_count = VLQ::read_int(fp);
 	for (i = 0; i < dir_count; i++) {
 		s1 = VLQ::read_int(fp);
-		name = (char *) calloc(1, s1 + 1);
+		name = (char *) calloc(s1 + 1, 1);
 		fread(name, 1, s1, fp);
 		s2 = VLQ::read_int(fp);
 
@@ -377,20 +386,27 @@ void XEN::read_file(const char* fname) {
 			map<string, _FILE>()
 		));
 		map<string, _FILE>& _CUR_DIR = _DIRECTORY[string(name)];
-		printf("  Directory: %s\n", name);
+		//printf("  Directory: %s\n", name);
 
 		//Now for the files.
 		for (j = 0; j < s2; j++) {
-			s3 = VLQ::read_int(fp);
-			file_n = (char *) calloc(1, s3 + 1);
+			s3 = VLQ::read_int(fp); //Length of name
+			file_n = (char *) calloc(s3 + 1, 1);
 			fread(file_n, 1, s3, fp);
 
 			_CUR_DIR.insert(pair<string, _FILE>(
 				string(file_n),
 				_FILE()
 			));
-			printf("    File: %s\n", file_n);
+			//printf("    File: %s\n", file_n);
+			_FILE& _CUR_FILE = _CUR_DIR[string(file_n)];
+			
+			//Set up file properties
+			_CUR_FILE.size = VLQ::read_int(fp);
+			_CUR_FILE.pos  = ftell(fp);
 
+			//Skip to the next file.
+			fseek(fp, _CUR_FILE.size, SEEK_CUR);
 			free(file_n);
 		}
 
@@ -398,6 +414,58 @@ void XEN::read_file(const char* fname) {
 	}
 
 	fclose(fp);
+}
+
+//Extraction Functions
+void XEN::extract_all(const char* path) {
+	if (_PATH == NULL)
+		return; //You are a failure.
+
+	FILE* fp = fopen(_PATH, "rb");
+
+	//Create Extraction Directory
+	CreateDirectory(path, NULL);
+
+	//Set up iterators
+	map<string, map<string, _FILE> >::iterator _DIR_ITERATOR;
+	map<string, _FILE>              ::iterator _FILE_ITERATOR;
+	string _cur_dir = ".";
+
+	for (_DIR_ITERATOR = _DIRECTORY.begin(); _DIR_ITERATOR != _DIRECTORY.end(); _DIR_ITERATOR++) {
+		//Create the directory
+		_cur_dir = string(path) + "\\" + _DIR_ITERATOR->first;
+		CreateDirectory(_cur_dir.c_str(), NULL);
+
+		//File Traversal
+		for (_FILE_ITERATOR = _DIR_ITERATOR->second.begin(); _FILE_ITERATOR != _DIR_ITERATOR->second.end(); _FILE_ITERATOR++) {
+			//Load packaged file into memory and write directly to the new file.
+			//TODO: Find a faster way to do this...
+			FILE* token = fopen((_cur_dir + "\\" + _FILE_ITERATOR->first).c_str(), "wb");
+			fseek(fp, _FILE_ITERATOR->second.pos, SEEK_SET);
+			cn_byte* BYTE = (cn_byte *) malloc(_FILE_ITERATOR->second.size);
+			fread (BYTE, 1, _FILE_ITERATOR->second.size, fp);
+			fwrite(BYTE, 1, _FILE_ITERATOR->second.size, token);
+			free(BYTE);
+			fclose(token);
+		}
+	}
+
+	fclose(fp);
+}
+
+//Secret functions only I can use because I am special
+string XEN::get_rest_of_stringstream(istringstream& _SS) {
+	string str;
+	getline(_SS, str); //YUP CHEATING
+	int str_cheat = 0;
+
+	while (str_cheat < str.length() && str[str_cheat] == ' ')
+		str_cheat++;
+
+	if (str_cheat > 0)
+		str.erase(0, str_cheat);
+
+	return str;
 }
 
 XEN::_FILE::~_FILE() {
